@@ -10,7 +10,7 @@ from mpi4py import MPI
 4 - delete
 """
 
-class API:
+class DistributedMemory:
     def __init__(self, verbose):
         self.comm = MPI.COMM_WORLD
         self.verbose = verbose
@@ -57,7 +57,6 @@ class Master:
                 availables.append((rank, start, remaining))
                 start += remaining
         return availables
-
     
     def malloc(self, size):
         if sum(self.slave_size) > size:
@@ -73,35 +72,53 @@ class Master:
         self.counter += 1
         return key
 
+    def speak(self, req, verbose):
+        if verbose:
+            if req[0] == 1:
+                print("Master: malloc of size {}".format(req[1]))
+
+
     def run(self, verbose):
         while True:
             req = self.comm.recv(source=0)
+            self.speak(req, verbose)
             if req[0] == 1:
                 key = self.malloc(req[1])
                 self.comm.send(key, dest=0)
 
 
 class Slave:
-    def __init__(self, max_size):
+    def __init__(self, rank, max_size):
         self.comm = MPI.COMM_WORLD
+        self.rank = rank
         self.max_size = max_size
         self.memory = {}
 
     def malloc(self, key, size):
        self.memory[key] = [None] * size 
 
+    def speak(self, req, verbose):
+        if verbose:
+            if req[0] == 1:
+                print("Slave {}: malloc of size {} for key {}".format(self.rank,
+                                                                      req[2],
+                                                                      req[1]))
+
     def run(self, verbose):
         while True:
             req = self.comm.recv(source=1)
+            self.speak(req, verbose)
             if req[0] == 1:
                 self.malloc(req[1], req[2])
+            
 
 def launch(max_size=None, verbose=False):
     rank = MPI.COMM_WORLD.Get_rank()
 
     if (rank == 0):
-        return API(verbose)
+        return DistributedMemory(verbose)
     elif rank == 1:
         Master(max_size).run(verbose)
     else:
-        Slave(max_size).run(verbose)
+        Slave(rank, max_size).run(verbose)
+    exit(0)
