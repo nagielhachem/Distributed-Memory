@@ -3,14 +3,15 @@ import allocator
 import sys
 
 if (__name__ == "__main__"):
-    if (len(sys.argv) != 4):
-        print("Format: %s max_size max_child verbose" % sys.argv[0])
+    if (len(sys.argv) != 3):
+        print("Format: {} max_size verbose".format(sys.argv[0]))
         exit(1)
 
     max_size  = int(sys.argv[1])
-    verbose   = bool(sys.argv[3])
+    verbose   = bool(sys.argv[2])
 
-    allocator.launch(max_size, verbose)
+    mem = allocator.launch(max_size, verbose)
+    mem.malloc(100)
 
     # TODO: CODE UTILISATEUR
     #  - lire le tableau

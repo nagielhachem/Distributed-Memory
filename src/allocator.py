@@ -54,12 +54,12 @@ class Master:
                 break
             remaining = min(self.slave_size[rank], size - start)
             if remaining != 0:
-                availables.append((rank, start, remaining))
+                availables.append((rank + 2, start, remaining))
                 start += remaining
         return availables
     
     def malloc(self, size):
-        if sum(self.slave_size) > size:
+        if sum(self.slave_size) < size:
             return -1
         key = self.counter
         available_slaves = self.choose_slaves(size) 
@@ -87,6 +87,7 @@ class Master:
                 self.comm.send(key, dest=0)
 
 
+
 class Slave:
     def __init__(self, rank, max_size):
         self.comm = MPI.COMM_WORLD
@@ -103,6 +104,8 @@ class Slave:
                 print("Slave {}: malloc of size {} for key {}".format(self.rank,
                                                                       req[2],
                                                                       req[1]))
+            else:
+                print("Slave {}: Unknown Request".format(self.rank))
 
     def run(self, verbose):
         while True:
