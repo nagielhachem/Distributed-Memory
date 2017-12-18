@@ -81,18 +81,20 @@ class Master:
                 self.comm.send(key, dest=0)
 
 
-
-
 class Slave:
     def __init__(self, max_size):
         self.comm = MPI.COMM_WORLD
         self.max_size = max_size
+        self.memory = {}
 
-    def malloc(self, size):
-        pass
+    def malloc(self, key, size):
+       self.memory[key] = [None] * size 
 
     def run(self, verbose):
-        pass
+        while True:
+            req = self.comm.recv(source=1)
+            if req[0] == 1:
+                self.malloc(req[1], req[2])
 
 def launch(max_size=None, verbose=False):
     rank = MPI.COMM_WORLD.Get_rank()
