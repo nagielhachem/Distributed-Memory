@@ -12,6 +12,7 @@ if (__name__ == "__main__"):
 
     mem = allocator.launch(max_size, verbose)
     mem.malloc(100)
+    mem.close()
 
     # TODO: CODE UTILISATEUR
     #  - lire le tableau

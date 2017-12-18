@@ -31,6 +31,9 @@ class DistributedMemory:
     def __delitem__(self, key):
         pass
 
+    def close(self):
+        self.comm.send((0, ), dest = 1)
+
 class Master:
     def __init__(self, max_size):
         self.comm = MPI.COMM_WORLD
@@ -74,14 +77,25 @@ class Master:
 
     def speak(self, req, verbose):
         if verbose:
-            if req[0] == 1:
+            if req[0] == 0:
+                print("Master closing... Bye bye")
+            elif req[0] == 1:
                 print("Master: malloc of size {}".format(req[1]))
+            else:
+                print("Slave {}: Unknown Request".format(self.rank))
+    
+    def close_all(self):
+        for rank in range(2, self.comm.Get_size()):
+            self.comm.send((0, ), dest=rank)
 
 
     def run(self, verbose):
         while True:
             req = self.comm.recv(source=0)
             self.speak(req, verbose)
+            if req[0] == 0:
+               self.close_all()
+               break
             if req[0] == 1:
                 key = self.malloc(req[1])
                 self.comm.send(key, dest=0)
@@ -100,17 +114,19 @@ class Slave:
 
     def speak(self, req, verbose):
         if verbose:
-            if req[0] == 1:
+            if req[0] == 0:
+                print("Slave {} closing".format(self.rank))
+            elif req[0] == 1:
                 print("Slave {}: malloc of size {} for key {}".format(self.rank,
                                                                       req[2],
                                                                       req[1]))
-            else:
-                print("Slave {}: Unknown Request".format(self.rank))
 
     def run(self, verbose):
         while True:
             req = self.comm.recv(source=1)
             self.speak(req, verbose)
+            if req[0] == 0:
+                break
             if req[0] == 1:
                 self.malloc(req[1], req[2])
             
