@@ -105,17 +105,51 @@ class Master:
         self.counter += 1
         return key
 
-    def getitem(self, requests):
+    def is_size_conform(self, requests):
         total_size = 0
         for i, request in enumerate(requests):
-            if (request[2] == -1)
-                request[2] = self.size_of(request[0])
-            total_size += (request[2] - request[1]) // request[3]       \
-                       +  bool((request[2] - request[1]) % request[3])
+            key, start, stop, step = request
+            if (stop == -1)
+                stop = self.size_of(key)
+            total_size += (stop - start) // step       \
+                       +  bool((stop - start) % step)
 
-        if (total_size > self.max_size)
-            return -1
+        if (total_size > self.max_size):
+            return False
+        return True
 
+    def query_message(self, request):
+        """
+            return message:
+            [[rank, key, start, stop, step]]
+        """
+        key, start_mem, stop_mem, step_mem = request
+        message = []
+        cumulated_offset = 0
+        for rank_block, start_block, offset_block in self.block_infos[key]:
+            if start_mem <= start_block + offset_block:
+                step_slave = step_mem - cumulated_offset % step_mem
+                start_slave = start_mem - start_block + step_slave
+                offset_slave = min(offset_block, stop_mem - start_mem)
+                message.append([rank_block,
+                                key,
+                                start_slave,
+                                start_slave + offset_slave,
+                                step])
+                # update cumulated offset
+                cumulated_offset += offset_block
+        return message
+
+    def getitem(self, requests):
+        """
+        :params:
+            :requests: [key, start, stop, step]
+        """
+        if (not self.is_size_conform(requests)):
+            return -1        
+        for request in requests:
+            pass
+        
     def speak(self, req, verbose):
         if verbose:
             if req[0] == 0:
