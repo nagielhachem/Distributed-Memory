@@ -33,7 +33,7 @@ class DistributedMemory:
         message = []
         # case: request one or multiple arrays
         if (type(key) != tuple):
-            for i in range(key_to_list(key)):
+            for i in key_to_list(key):
                 message.append([i, 0, -1, 1])
         # case: request one or multiple slices of arrays
         elif (type(key) == tuple):
@@ -54,8 +54,8 @@ class DistributedMemory:
 
     def __setitem__(self, key, value):
         message = self.parse_key(key)
-        self.comm.send((3, message, value))
-        return self.comm.recv((source = 1))
+        self.comm.send((3, message, value), dest=1)
+        return self.comm.recv(source=1) == 0
 
     def __delitem__(self, key):
         pass
@@ -119,7 +119,7 @@ class Master:
                 return False
 
             if (stop == -1):
-                stop = self.size_of(key)
+                request[2] = self.size_of(key)
             total_size += (stop - start) // step       \
                        +  bool((stop - start) % step)
 
@@ -188,16 +188,58 @@ class Master:
         return self.merge_responses(responses)
 
 
+    def setitem(self, requests, value):
+        """
+        :params:
+            :requests: [key, start, stop, step]
+        """
+        if (not self.is_conform(requests)):
+            return -1
+
+        _, start, stop, step = requests[0]
+        total_size = (stop - start)     // step \
+                   + bool((stop - start) % step)
+        if (type(value) == int):
+            value = [value] * total_size
+        else:
+            if (len(value) != total_size):
+                return -1
+
+        queries = [subrequest for request    in requests
+                              for subrequest in self.split_request(request)]
+
+        shift    = 0
+        last_key = None
+        for query in queries:
+            rank, key, start, stop, step = query
+
+            if (last_key != key):
+                shift    = 0
+                last_key = key
+
+            message    = query[1:]
+            total_size = (stop - start) // step       \
+                       +  bool((stop - start) % step)
+
+            sub_value = value[shift: shift + total_size]
+            self.comm.send((3, message, sub_value), dest=rank)
+
+            shift += total_size
+        return 0
+
+
     def speak(self, req, verbose):
-        if verbose:
+        if (verbose >= 1):
             if req[0] == 0:
-                print("Master closing... Bye bye")
+                print("Master:\t\tclosing")
             elif req[0] == 1:
-                print("Master: malloc of size {}".format(req[1]))
+                print("Master:\t\tmalloc of size {}".format(req[1]))
             elif req[0] == 2:
-                print("Master: get items\n{}".format(req[1]))
+                print("Master:\t\tget items\n{}".format(req[1]))
+            elif req[0] == 3:
+                print("Master:\t\tset items\n{}\nto\n{}".format(req[1], req[2]))
             else:
-                print("Slave {}: Unknown Request".format(self.rank))
+                print("Master:\t\tUnknown Request".format(self.rank))
 
     def close_all(self):
         for rank in range(2, self.comm.Get_size()):
@@ -217,6 +259,9 @@ class Master:
             elif req[0] == 2:
                 val = self.getitem(req[1])
                 self.comm.send(val, dest=0)
+            elif req[0] == 3:
+                val = self.setitem(req[1], req[2])
+                self.comm.send(val, dest=0)
 
 
 
@@ -228,23 +273,28 @@ class Slave:
         self.memory = {}
 
     def malloc(self, key, size):
-#       self.memory[key] = [None] * size 
-       self.memory[key] = [i for i in range(size)] 
+       self.memory[key] = [None] * size 
 
     def getitem(self, query):
         key, start, stop, step = query
         return (key, self.memory[key][start:stop:step])
 
+    def setitem(self, query, value):
+        key, start, stop, step = query
+        self.memory[key][start:stop:step] = value
+
     def speak(self, req, verbose):
-        if verbose:
+        if (verbose >= 2):
             if req[0] == 0:
-                print("Slave {} closing".format(self.rank))
+                print("Slave {}:\tclosing".format(self.rank))
             elif req[0] == 1:
-                print("Slave {}: malloc of size {} for key {}".format(self.rank,
+                print("Slave {}:\tmalloc of size {} for key {}".format(self.rank,
                                                                       req[2],
                                                                       req[1]))
             elif req[0] == 2:
-                print("Slave {}: get item {}".format(self.rank, req[1]))
+                print("Slave {}:\tget item\n{}".format(self.rank, req[1]))
+            elif req[0] == 3:
+                print("Slave {}:\tset item\n{}\nto\n{}".format(self.rank, req[1], req[2]))
 
     def run(self, verbose):
         while True:
@@ -257,9 +307,11 @@ class Slave:
             elif req[0] == 2:
                 val = self.getitem(req[1])
                 self.comm.send(val, dest=1)
+            elif req[0] == 3:
+                val = self.setitem(req[1], req[2])
 
 
-def launch(max_size=None, verbose=False):
+def launch(max_size=None, verbose=0):
     rank = MPI.COMM_WORLD.Get_rank()
 
     if (rank == 0):

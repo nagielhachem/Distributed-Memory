@@ -8,12 +8,18 @@ if (__name__ == "__main__"):
         exit(1)
 
     max_size  = int(sys.argv[1])
-    verbose   = bool(sys.argv[2])
+    verbose   = int(sys.argv[2])
 
     mem = allocator.launch(max_size, verbose)
     mem.malloc(5)
-    mem.malloc(100)
-    print(mem[1,   0:10:2])
+    mem.malloc(15)
+    print(mem[1])
+    mem[1] = 2
+    print(mem[1])
+    mem[1,8] = 6
+    print(mem[1])
+    mem[1,9:14] = 4
+    print(mem[1])
     mem.close()
 
     # TODO: CODE UTILISATEUR
