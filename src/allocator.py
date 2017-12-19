@@ -41,7 +41,7 @@ class DistributedMemory:
             val    = key[1]
             start  = val     if (type(val) == int) else val.start
             stop   = val + 1 if (type(val) == int) else val.stop
-            step   =       1 if (type(val) == int) else val.step
+            step   =       1 if (type(val) == int or val.step is None) else val.step
             for i in arrays:
                 message.append([i, start, stop, step])
 
@@ -105,11 +105,15 @@ class Master:
         self.counter += 1
         return key
 
-    def is_size_conform(self, requests):
+    def is_conform(self, requests):
         total_size = 0
         for i, request in enumerate(requests):
             key, start, stop, step = request
-            if (stop == -1)
+
+            if (not key in self.block_infos):
+                return False
+
+            if (stop == -1):
                 stop = self.size_of(key)
             total_size += (stop - start) // step       \
                        +  bool((stop - start) % step)
@@ -118,7 +122,7 @@ class Master:
             return False
         return True
 
-    def query_message(self, request):
+    def split_request(self, request):
         """
             return message:
             [[rank, key, start, stop, step]]
@@ -128,28 +132,56 @@ class Master:
         cumulated_offset = 0
         for rank_block, start_block, offset_block in self.block_infos[key]:
             if start_mem <= start_block + offset_block:
-                step_slave = step_mem - cumulated_offset % step_mem
-                start_slave = start_mem - start_block + step_slave
+                step_slave   = step_mem  - cumulated_offset % step_mem
+                start_slave  = max(start_mem - start_block, 0) + step_slave
                 offset_slave = min(offset_block, stop_mem - start_mem)
                 message.append([rank_block,
                                 key,
                                 start_slave,
                                 start_slave + offset_slave,
-                                step])
-                # update cumulated offset
+                                step_mem])
+                # update parameters
                 cumulated_offset += offset_block
         return message
+
+    def merge_responses(self, responses):
+        arrays = {}
+        for rank, response in responses:
+            key, array = response
+            arrays[key] = (rank, array)
+
+        results = []
+        for key in sorted(arrays.keys()):
+            result = []
+            for response in sorted(arrays[key]):
+                results += response[1]
+            results.append(result)
+
+        return results
 
     def getitem(self, requests):
         """
         :params:
             :requests: [key, start, stop, step]
         """
-        if (not self.is_size_conform(requests)):
-            return -1        
-        for request in requests:
-            pass
-        
+        if (not self.is_conform(requests)):
+            return -1
+
+        queries = [subrequest for request    in requests
+                              for subrequest in self.split_request(request)]
+
+        for query in queries:
+            rank    = query[0]
+            message = query[1:]
+            self.comm.isend((2, message), dest=rank)
+
+        responses = []
+        for rank, _, _, _, _ in queries:
+            responses.append((rank, self.comm.recv(source=rank)))
+
+        return self.merge_responses(responses)
+
+
     def speak(self, req, verbose):
         if verbose:
             if req[0] == 0:
@@ -177,8 +209,8 @@ class Master:
                 key = self.malloc(req[1])
                 self.comm.send(key, dest=0)
             elif req[0] == 2:
-                key = self.getitem(req[1])
-                self.comm.send(key, dest=0)
+                val = self.getitem(req[1])
+                self.comm.send(val, dest=0)
 
 
 
@@ -192,6 +224,10 @@ class Slave:
     def malloc(self, key, size):
        self.memory[key] = [None] * size 
 
+    def getitem(self, query):
+        key, start, stop, step = query
+        return (key, self.memory[key][start:stop:step])
+
     def speak(self, req, verbose):
         if verbose:
             if req[0] == 0:
@@ -200,6 +236,8 @@ class Slave:
                 print("Slave {}: malloc of size {} for key {}".format(self.rank,
                                                                       req[2],
                                                                       req[1]))
+            elif req[0] == 2:
+                print("Slave {}: get item {}".format(self.rank, req[1]))
 
     def run(self, verbose):
         while True:
@@ -207,8 +245,11 @@ class Slave:
             self.speak(req, verbose)
             if req[0] == 0:
                 break
-            if req[0] == 1:
+            elif req[0] == 1:
                 self.malloc(req[1], req[2])
+            elif req[0] == 2:
+                val = self.getitem(req[1])
+                self.comm.send(val, dest=1)
 
 
 def launch(max_size=None, verbose=False):

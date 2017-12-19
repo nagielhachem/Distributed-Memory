@@ -12,12 +12,13 @@ if (__name__ == "__main__"):
 
     mem = allocator.launch(max_size, verbose)
     mem.malloc(100)
-    mem[1, 3:8]
-    mem[1:8, 3:8]
+    mem.malloc(100)
+    print(mem[0,   1:8])
+    # print(mem[0:2, 3:5])
     mem.close()
 
     # TODO: CODE UTILISATEUR
-    #  - lire le tableau
+    # - lire le tableau
     #  - ajouter le tableau
     #  - appliquer la méthode de tri au tableau
     #  - joindre les données des tableaux
