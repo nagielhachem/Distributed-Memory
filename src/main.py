@@ -11,10 +11,9 @@ if (__name__ == "__main__"):
     verbose   = bool(sys.argv[2])
 
     mem = allocator.launch(max_size, verbose)
+    mem.malloc(5)
     mem.malloc(100)
-    mem.malloc(100)
-    print(mem[0,   1:8])
-    # print(mem[0:2, 3:5])
+    print(mem[1,   0:10:2])
     mem.close()
 
     # TODO: CODE UTILISATEUR

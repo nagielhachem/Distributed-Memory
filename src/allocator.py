@@ -131,16 +131,17 @@ class Master:
         message = []
         cumulated_offset = 0
         for rank_block, start_block, offset_block in self.block_infos[key]:
-            if start_mem <= start_block + offset_block:
-                step_slave   = step_mem  - cumulated_offset % step_mem
-                start_slave  = max(start_mem - start_block, 0) + step_slave
-                offset_slave = min(offset_block, stop_mem - start_mem)
+            if start_mem < start_block + offset_block and start_mem < stop_mem:
+                step_slave   = cumulated_offset % step_mem
+                start_slave  = start_mem - start_block + step_slave 
+                offset_slave = min(offset_block - start_slave, stop_mem - start_mem) 
                 message.append([rank_block,
                                 key,
                                 start_slave,
-                                start_slave + offset_slave,
+                                start_slave + offset_slave - step_slave,
                                 step_mem])
                 # update parameters
+                start_mem += offset_slave
                 cumulated_offset += offset_block
         return message
 
@@ -148,15 +149,15 @@ class Master:
         arrays = {}
         for rank, response in responses:
             key, array = response
-            arrays[key] = (rank, array)
-
+            if key not in arrays:
+                arrays[key] = []
+            arrays[key].append((rank, array))
         results = []
         for key in sorted(arrays.keys()):
             result = []
             for response in sorted(arrays[key]):
-                results += response[1]
+                result += response[1]
             results.append(result)
-
         return results
 
     def getitem(self, requests):
@@ -217,12 +218,13 @@ class Master:
 class Slave:
     def __init__(self, rank, max_size):
         self.comm = MPI.COMM_WORLD
-        self.rank = rank
+        self.rank = rank - 2
         self.max_size = max_size
         self.memory = {}
 
     def malloc(self, key, size):
-       self.memory[key] = [None] * size 
+#       self.memory[key] = [None] * size 
+       self.memory[key] = [i for i in range(size)] 
 
     def getitem(self, query):
         key, start, stop, step = query
