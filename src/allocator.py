@@ -29,7 +29,7 @@ class DistributedMemory:
         key = self.comm.recv(source=1)
         return key
 
-    def __getitem__(self, key):
+    def parse_key(self, key):
         message = []
         # case: request one or multiple arrays
         if (type(key) != tuple):
@@ -44,13 +44,18 @@ class DistributedMemory:
             step   =       1 if (type(val) == int or val.step is None) else val.step
             for i in arrays:
                 message.append([i, start, stop, step])
+        return message
 
+    def __getitem__(self, key):
+        message = self.parse_key(key)
         self.comm.send((2, message), dest=1)
         key = self.comm.recv(source=1)
         return key
 
     def __setitem__(self, key, value):
-        pass
+        message = self.parse_key(key)
+        self.comm.send((3, message, value))
+        return self.comm.recv((source = 1))
 
     def __delitem__(self, key):
         pass
