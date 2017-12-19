@@ -12,6 +12,8 @@ if (__name__ == "__main__"):
 
     mem = allocator.launch(max_size, verbose)
     mem.malloc(100)
+    mem[1, 3:8]
+    mem[1:8, 3:8]
     mem.close()
 
     # TODO: CODE UTILISATEUR

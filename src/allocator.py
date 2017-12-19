@@ -10,6 +10,15 @@ from mpi4py import MPI
 4 - delete
 """
 
+
+def key_to_list(val):
+    if (type(val) == int):
+        return [val]
+    elif (type(val) == slice):
+        step = 1 if (val.step is None) else val.step
+        return [i in range(val.start, val.stop, step)]
+
+
 class DistributedMemory:
     def __init__(self, verbose):
         self.comm = MPI.COMM_WORLD
@@ -21,9 +30,24 @@ class DistributedMemory:
         return key
 
     def __getitem__(self, key):
-        self.comm.send(key, dest=1)
-        value = self.comm.recv(source=1)
-        return value
+        message = []
+        # case: request one or multiple arrays
+        if (type(key) != tuple):
+            for i in range(key_to_list(key)):
+                message.append([i, 0, -1, 1])
+        # case: request one or multiple slices of arrays
+        elif (type(key) == tuple):
+            arrays = key_to_list(key[0])
+            val    = key[1]
+            start  = val     if (type(val) == int) else val.start
+            stop   = val + 1 if (type(val) == int) else val.stop
+            step   =       1 if (type(val) == int) else val.step
+            for i in arrays:
+                message.append([i, start, stop, step])
+
+        self.comm.send((2, message), dest=1)
+        key = self.comm.recv(source=1)
+        return key
 
     def __setitem__(self, key, value):
         pass
@@ -41,6 +65,12 @@ class Master:
         self.counter = 0
         self.block_infos = {}
         self.slave_size = [max_size] * (self.comm.Get_size() - 2)
+
+    def size_of(self, key):
+        result = 0
+        for _, _, offset in self.block_infos[key]:
+            result += offset
+        return result
 
     def choose_slaves(self, size):
         """
@@ -60,7 +90,7 @@ class Master:
                 availables.append((rank + 2, start, remaining))
                 start += remaining
         return availables
-    
+
     def malloc(self, size):
         if sum(self.slave_size) < size:
             return -1
@@ -75,15 +105,28 @@ class Master:
         self.counter += 1
         return key
 
+    def getitem(self, requests):
+        total_size = 0
+        for i, request in enumerate(requests):
+            if (request[2] == -1)
+                request[2] = self.size_of(request[0])
+            total_size += (request[2] - request[1]) // request[3]       \
+                       +  bool((request[2] - request[1]) % request[3])
+
+        if (total_size > self.max_size)
+            return -1
+
     def speak(self, req, verbose):
         if verbose:
             if req[0] == 0:
                 print("Master closing... Bye bye")
             elif req[0] == 1:
                 print("Master: malloc of size {}".format(req[1]))
+            elif req[0] == 2:
+                print("Master: get items\n{}".format(req[1]))
             else:
                 print("Slave {}: Unknown Request".format(self.rank))
-    
+
     def close_all(self):
         for rank in range(2, self.comm.Get_size()):
             self.comm.send((0, ), dest=rank)
@@ -96,8 +139,11 @@ class Master:
             if req[0] == 0:
                self.close_all()
                break
-            if req[0] == 1:
+            elif req[0] == 1:
                 key = self.malloc(req[1])
+                self.comm.send(key, dest=0)
+            elif req[0] == 2:
+                key = self.getitem(req[1])
                 self.comm.send(key, dest=0)
 
 
@@ -129,7 +175,7 @@ class Slave:
                 break
             if req[0] == 1:
                 self.malloc(req[1], req[2])
-            
+
 
 def launch(max_size=None, verbose=False):
     rank = MPI.COMM_WORLD.Get_rank()
