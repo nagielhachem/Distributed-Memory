@@ -33,7 +33,7 @@ class Slave:
             elif req[0] == 2:
                 print("Slave {}:\tget item {}".format(self.rank, req[1]))
             elif req[0] == 3:
-                print("Slave {}:\tset item {} to {}".format(self.rank, req[1], req[2]))
+                print("Slave {}:\tset item {}".format(self.rank, req[1]))
             elif req[0] == 4:
                 print("Slave {}:\tdel item {}".format(self.rank, req[1]))
 

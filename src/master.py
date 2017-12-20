@@ -189,7 +189,7 @@ class Master:
             elif req[0] == 2:
                 print("Master:\t\tget items\n{}".format(req[1]))
             elif req[0] == 3:
-                print("Master:\t\tset items\n{}\nto\n{}".format(req[1], req[2]))
+                print("Master:\t\tset items\n{}".format(req[1]))
             elif req[0] == 4:
                 print("Master:\t\tdel items\n{}".format(req[1]))
             else:

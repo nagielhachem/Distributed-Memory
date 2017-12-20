@@ -25,7 +25,16 @@ if (__name__ == "__main__"):
     f.close()
 
     # Sort the array
-
+    flag  = False
+    shift = node_size // 2
+    while (not flag):
+        flag = True
+        for i in range(2 * memory_size // node_size - 2):
+            array        = memory[0, i * shift: i * shift + node_size][0]
+            sorted_array = sorted(array)
+            if (array != sorted_array):
+                flag = False
+                memory[0, i * shift: i * shift + node_size] = sorted_array
 
     # Get the array back and write it to new file
     f           = open("sorted.txt", "w")
