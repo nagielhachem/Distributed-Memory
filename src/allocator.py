@@ -24,10 +24,22 @@ class DistributedMemory:
         self.comm = MPI.COMM_WORLD
         self.verbose = verbose
 
+    def handle_errors(self, response):
+        if (type(response[1]) == int and response[1] < 0):
+            self.close()
+            if (response[1] == -1):
+                raise Exception("Not enough memory")
+            elif (response[1] == -2):
+                raise Exception("Unknown key")
+            else:
+                raise Exception("Invalid request")
+
+
     def malloc(self, size):
         self.comm.send((1, size), dest=1)
-        key = self.comm.recv(source=1)
-        return key
+        response = self.comm.recv(source=1)
+        self.handle_errors(response)
+        return response[1]
 
     def parse_key(self, key):
         message = []
@@ -47,18 +59,26 @@ class DistributedMemory:
         return message
 
     def __getitem__(self, key):
-        message = self.parse_key(key)
+        message  = self.parse_key(key)
         self.comm.send((2, message), dest=1)
-        key = self.comm.recv(source=1)
-        return key
+        response = self.comm.recv(source=1)
+        self.handle_errors(response)
+        return response[1]
 
     def __setitem__(self, key, value):
         message = self.parse_key(key)
         self.comm.send((3, message, value), dest=1)
-        return self.comm.recv(source=1) == 0
+        response = self.comm.recv(source=1)
+        self.handle_errors(response)
 
     def __delitem__(self, key):
-        pass
+        if (type(key) == tuple):
+            return False
+
+        message  = self.parse_key(key)
+        self.comm.send((4, message, value), dest=1)
+        response = self.comm.recv(source=1)
+        self.handle_errors(response)
 
     def close(self):
         self.comm.send((0, ), dest = 1)
@@ -110,13 +130,13 @@ class Master:
         self.counter += 1
         return key
 
-    def is_conform(self, requests):
+    def is_not_conform(self, requests):
         total_size = 0
         for i, request in enumerate(requests):
             key, start, stop, step = request
 
             if (not key in self.block_infos):
-                return False
+                return -2
 
             if (stop == -1):
                 request[2] = self.size_of(key)
@@ -124,8 +144,8 @@ class Master:
                        +  bool((stop - start) % step)
 
         if (total_size > self.max_size):
-            return False
-        return True
+            return -1
+        return 0
 
     def split_request(self, request):
         """
@@ -170,8 +190,9 @@ class Master:
         :params:
             :requests: [key, start, stop, step]
         """
-        if (not self.is_conform(requests)):
-            return -1
+        status = self.is_not_conform(requests)
+        if (status != 0):
+            return status
 
         queries = [subrequest for request    in requests
                               for subrequest in self.split_request(request)]
@@ -193,8 +214,9 @@ class Master:
         :params:
             :requests: [key, start, stop, step]
         """
-        if (not self.is_conform(requests)):
-            return -1
+        status = self.is_not_conform(requests)
+        if (status != 0):
+            return status
 
         _, start, stop, step = requests[0]
         total_size = (stop - start)     // step \
@@ -203,7 +225,7 @@ class Master:
             value = [value] * total_size
         else:
             if (len(value) != total_size):
-                return -1
+                return -3
 
         queries = [subrequest for request    in requests
                               for subrequest in self.split_request(request)]
@@ -228,6 +250,21 @@ class Master:
         return 0
 
 
+    def delitem(self, requests):
+        for key, _, _, _ in requests:
+            for rank, _, _ in self.block_infos[key]:
+                self.comm.isend((4, key), dest=rank)
+
+        status = 0
+        for key, _, _, _ in requests:
+            for rank, _, _ in self.block_infos[key]:
+                slave_status = self.comm.recv(source=rank)
+                if (slave_status != 0):
+                    status = slave_status
+
+        return status
+
+
     def speak(self, req, verbose):
         if (verbose >= 1):
             if req[0] == 0:
@@ -238,13 +275,14 @@ class Master:
                 print("Master:\t\tget items\n{}".format(req[1]))
             elif req[0] == 3:
                 print("Master:\t\tset items\n{}\nto\n{}".format(req[1], req[2]))
+            elif req[0] == 4:
+                print("Master:\t\tdel items\n{}".format(req[1]))
             else:
                 print("Master:\t\tUnknown Request".format(self.rank))
 
     def close_all(self):
         for rank in range(2, self.comm.Get_size()):
             self.comm.send((0, ), dest=rank)
-
 
     def run(self, verbose):
         while True:
@@ -255,13 +293,16 @@ class Master:
                break
             elif req[0] == 1:
                 key = self.malloc(req[1])
-                self.comm.send(key, dest=0)
+                self.comm.send((1, key), dest=0)
             elif req[0] == 2:
                 val = self.getitem(req[1])
-                self.comm.send(val, dest=0)
+                self.comm.send((2, val), dest=0)
             elif req[0] == 3:
                 val = self.setitem(req[1], req[2])
-                self.comm.send(val, dest=0)
+                self.comm.send((3, val), dest=0)
+            elif req[0] == 4:
+                val = self.delitem(req[1])
+                self.comm.send((4, val), dest=0)
 
 
 
@@ -283,6 +324,9 @@ class Slave:
         key, start, stop, step = query
         self.memory[key][start:stop:step] = value
 
+    def delitem(self, key):
+        del self.memory[key]
+
     def speak(self, req, verbose):
         if (verbose >= 2):
             if req[0] == 0:
@@ -295,6 +339,8 @@ class Slave:
                 print("Slave {}:\tget item\n{}".format(self.rank, req[1]))
             elif req[0] == 3:
                 print("Slave {}:\tset item\n{}\nto\n{}".format(self.rank, req[1], req[2]))
+            elif req[0] == 4:
+                print("Slave {}:\tdel item\n{}".format(self.rank, req[1]))
 
     def run(self, verbose):
         while True:
@@ -308,7 +354,9 @@ class Slave:
                 val = self.getitem(req[1])
                 self.comm.send(val, dest=1)
             elif req[0] == 3:
-                val = self.setitem(req[1], req[2])
+                self.setitem(req[1], req[2])
+            elif req[0] == 4:
+                self.delitem(req[1])
 
 
 def launch(max_size=None, verbose=0):
