@@ -181,10 +181,14 @@ class Master:
 
 
     def speak(self, req, verbose):
-        if (verbose >= 1):
+        if verbose >= 3:
             if req[0] == 0:
                 print("Master:\t\tclosing")
-            elif req[0] == 1:
+        elif verbose >= 2:
+            if req[0] == 0:
+                print("Master:\t\tclosing\n\t\t --> closing all slaves")
+        elif (verbose >= 1):
+            if req[0] == 1:
                 print("Master:\t\tmalloc of size {}".format(req[1]))
             elif req[0] == 2:
                 print("Master:\t\tget items\n{}".format(req[1]))
