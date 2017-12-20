@@ -4,29 +4,34 @@ import sys
 
 if (__name__ == "__main__"):
     if (len(sys.argv) != 3):
-        print("Format: {} max_size verbose".format(sys.argv[0]))
+        print("Format: {} node_size verbose".format(sys.argv[0]))
         exit(1)
 
-    max_size  = int(sys.argv[1])
+    node_size = int(sys.argv[1])
     verbose   = int(sys.argv[2])
+    memory    = allocator.launch(node_size, verbose)
 
-    mem = allocator.launch(max_size, verbose)
-    mem.malloc(5)
-    mem.malloc(15)
-    print(mem[1])
-    mem[1] = 2
-    print(mem[1])
-    mem[1,8] = 6
-    print(mem[1])
-    mem[1,9:14] = 4
-    print(mem[1])
-    del mem[1]
-    print(mem[1])
-    mem.close()
+    # Get data from file and set memory by groups of node_size
+    f           = open("random.txt", "r")
+    memory_size = int(f.readline())
+    memory.malloc(memory_size)
+    for i in range(memory_size // node_size):
+        array_size = min(node_size, memory_size - i * node_size)
+        array      = []
+        for j in range(array_size):
+            array.append(int(f.readline()))
+        memory[0, i * node_size: i * node_size + array_size] = array
+    f.close()
 
-    # TODO: CODE UTILISATEUR
-    # - lire le tableau
-    #  - ajouter le tableau
-    #  - appliquer la méthode de tri au tableau
-    #  - joindre les données des tableaux
-    #  - appliquer la méthode etc etc
+    # Sort the array
+
+
+    # Get the array back and write it to new file
+    f           = open("sorted.txt", "w")
+    f.write("%d\n" % memory_size)
+    for i in range(memory_size // node_size):
+        array_size = min(node_size, memory_size - i * node_size)
+        array = memory[0, i * node_size: i * node_size + array_size][0]
+        for val in array:
+            f.write("%d\n" % val)
+    f.close()

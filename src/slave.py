@@ -25,7 +25,7 @@ class Slave:
         if verbose >= 3:
             if req[0] == 0:
                 print("Slave {}:\tclosing".format(self.rank))
-        elif verbose >= 2:
+        if verbose >= 2:
             if req[0] == 1:
                 print("Slave {}:\tmalloc of size {} for key {}".format(self.rank,
                                                                       req[2],

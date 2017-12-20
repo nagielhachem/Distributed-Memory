@@ -184,10 +184,10 @@ class Master:
         if verbose >= 3:
             if req[0] == 0:
                 print("Master:\t\tclosing")
-        elif verbose >= 2:
+        if verbose >= 2:
             if req[0] == 0:
                 print("Master:\t\tclosing\n\t\t --> closing all slaves")
-        elif (verbose >= 1):
+        if (verbose >= 1):
             if req[0] == 1:
                 print("Master:\t\tmalloc of size {}".format(req[1]))
             elif req[0] == 2:
@@ -222,5 +222,3 @@ class Master:
             elif req[0] == 4:
                 val = self.delitem(req[1])
                 self.comm.send((4, val), dest=0)
-
-

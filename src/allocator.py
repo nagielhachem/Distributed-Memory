@@ -22,9 +22,8 @@ def key_to_list(val):
 
 
 class Manager:
-    def __init__(self, verbose):
+    def __init__(self):
         self.comm = MPI.COMM_WORLD
-        self.verbose = verbose
 
     def handle_errors(self, response):
         if (type(response[1]) == int and response[1] < 0):
@@ -89,7 +88,7 @@ def launch(max_size=None, verbose=0):
     rank = MPI.COMM_WORLD.Get_rank()
 
     if (rank == 0):
-        return Manager(verbose)
+        return Manager()
     elif rank == 1:
         Master(max_size).run(verbose)
     else:
