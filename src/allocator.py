@@ -73,10 +73,10 @@ class DistributedMemory:
 
     def __delitem__(self, key):
         if (type(key) == tuple):
-            return False
+            self.handle_errors((4, -3))
 
         message  = self.parse_key(key)
-        self.comm.send((4, message, value), dest=1)
+        self.comm.send((4, message), dest=1)
         response = self.comm.recv(source=1)
         self.handle_errors(response)
 
@@ -251,16 +251,14 @@ class Master:
 
 
     def delitem(self, requests):
-        for key, _, _, _ in requests:
-            for rank, _, _ in self.block_infos[key]:
-                self.comm.isend((4, key), dest=rank)
-
         status = 0
         for key, _, _, _ in requests:
+            if (not key in self.block_infos):
+                status = -2
+                break
             for rank, _, _ in self.block_infos[key]:
-                slave_status = self.comm.recv(source=rank)
-                if (slave_status != 0):
-                    status = slave_status
+                self.comm.send((4, key), dest=rank)
+            del self.block_infos[key]
 
         return status
 
@@ -336,11 +334,11 @@ class Slave:
                                                                       req[2],
                                                                       req[1]))
             elif req[0] == 2:
-                print("Slave {}:\tget item\n{}".format(self.rank, req[1]))
+                print("Slave {}:\tget item {}".format(self.rank, req[1]))
             elif req[0] == 3:
-                print("Slave {}:\tset item\n{}\nto\n{}".format(self.rank, req[1], req[2]))
+                print("Slave {}:\tset item {} to {}".format(self.rank, req[1], req[2]))
             elif req[0] == 4:
-                print("Slave {}:\tdel item\n{}".format(self.rank, req[1]))
+                print("Slave {}:\tdel item {}".format(self.rank, req[1]))
 
     def run(self, verbose):
         while True:

@@ -20,6 +20,8 @@ if (__name__ == "__main__"):
     print(mem[1])
     mem[1,9:14] = 4
     print(mem[1])
+    del mem[1]
+    print(mem[1])
     mem.close()
 
     # TODO: CODE UTILISATEUR
