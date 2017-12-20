@@ -181,14 +181,10 @@ class Master:
 
 
     def speak(self, req, verbose):
-        if verbose >= 3:
+        if (verbose >= 1):
             if req[0] == 0:
                 print("Master:\t\tclosing")
-        if verbose >= 2:
-            if req[0] == 0:
-                print("Master:\t\tclosing\n\t\t --> closing all slaves")
-        if (verbose >= 1):
-            if req[0] == 1:
+            elif req[0] == 1:
                 print("Master:\t\tmalloc of size {}".format(req[1]))
             elif req[0] == 2:
                 print("Master:\t\tget items\n{}".format(req[1]))
@@ -197,7 +193,7 @@ class Master:
             elif req[0] == 4:
                 print("Master:\t\tdel items\n{}".format(req[1]))
             else:
-                print("Master:\t\tUnknown Request".format(self.rank))
+                print("Master:\t\tUnknown Request")
 
     def close_all(self):
         for rank in range(2, self.comm.Get_size()):

@@ -15,6 +15,7 @@ if __name__ == "__main__":
     random.seed(seed)
     f    = open("./random.txt", "w")
     buf  = "%d\n" % size
+    f.write(buf)
     for i in range(size // 1000 + 1):
         rand = random.randint(size, size=min(1000, size - i * 1000))
         buf  = ""

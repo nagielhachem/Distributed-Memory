@@ -14,6 +14,7 @@ if (__name__ == "__main__"):
     # Get data from file and set memory by groups of node_size
     f           = open("random.txt", "r")
     memory_size = int(f.readline())
+    print(memory_size) # DEBUG
     memory.malloc(memory_size)
     for i in range(memory_size // node_size):
         array_size = min(node_size, memory_size - i * node_size)
@@ -35,3 +36,4 @@ if (__name__ == "__main__"):
         for val in array:
             f.write("%d\n" % val)
     f.close()
+    memory.close()
