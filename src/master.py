@@ -13,7 +13,7 @@ class Master:
         Gets the allocated size of the array.
 
         Params:
-            :key -- int: key (id) of the array
+            :key  -- int: key (id) of the array
 
         Return:
             :size -- int: size of array
@@ -29,7 +29,7 @@ class Master:
         Chooses salves that will be used to allocate memory.
         
         Params:
-            :size -- int: size of memory that needs to be allocated
+            :size   -- int: size of memory that needs to be allocated
 
         Return:
             :slaves -- [(int, int, int)]: chosen slaves and info [(rank, start, offset)]
@@ -56,7 +56,7 @@ class Master:
             :size -- int: size of memory that needs to be allocated
 
         Return:
-            :key -- int: key identifying the array to be allocated 
+            :key  -- int: key identifying the array to be allocated 
         """
 
         if sum(self.slave_size) < size:
@@ -83,7 +83,7 @@ class Master:
             :requests -- [[int, int, int, int]]: [[key, start, stop, step]]
 
         Return:
-            :status -- int: error message
+            :status   -- int: error message
                  0 if no error
                 -1 if size is too big
                 -2 if key is not conform
@@ -111,7 +111,7 @@ class Master:
         Finds which slaves contains the requested array and construct a request per slave
 
         Params:
-            :request -- [int, int, int, int]: [key, start, stop, step]
+            :request    -- [int, int, int, int]: [key, start, stop, step]
 
         Return:
             :subrequest -- [[int, int, int, int, int]]: [[rank, key, start, stop, step]]
@@ -149,7 +149,7 @@ class Master:
             :responses -- [(int, (int, [])] : [ (rank, (key, slave response array)) ]
     
         Return:
-            :results -- [[]] : [ arrays concatenation ordered by key ]
+            :results   -- [[]] : [ arrays concatenation ordered by key ]
         """
 
         # group respones by key
@@ -180,7 +180,7 @@ class Master:
             :requests -- [ [int, int, int, int] ]: [ [key, start, stop, step] ]
 
         Return:
-            :results -- [[]] : [ requested arrays ]
+            :results  -- [[]] : [ requested arrays ]
         """
 
         status = self.is_not_conform(requests)
@@ -205,10 +205,11 @@ class Master:
     def setitem(self, requests, value):
         """
         Sets requested items to value
-            requests must be one array
+            requests can be one array or slice of arrays
             requested array can be hole or sliced [start:stop:step]
             value can be an integer which will be broadcasted int arrays
             value can be an array of the same size of the slice
+            if request contains multiple arrays, they will all be set to the same value
 
         Params:
             :requests -- [ [int, int, int, int] ]: [ [key, start, stop, step] ]
@@ -263,7 +264,7 @@ class Master:
             :requests -- [ [int, int, int, int] ]: [ [key, _, _, _] ]
 
         Return:
-            :status -- int: delete status
+            :status   -- int: delete status
                  0 if deletion successful
                 -2 if  no array with requested key
         """
@@ -279,9 +280,9 @@ class Master:
 
         return status
 
-   def speak(self, request, verbose):
+    def speak(self, request, verbose):
         """
-        Prints requestuested action based on verbose level
+        Prints requested action based on verbose level
 
         Params:
             :request -- [(...)]:
@@ -334,4 +335,4 @@ class Master:
                 self.comm.send((3, val), dest=0)
             elif req[0] == 4:
                 val = self.delitem(req[1])
-                 self.comm.send((4, val), dest=0)
+                self.comm.send((4, val), dest=0)

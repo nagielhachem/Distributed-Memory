@@ -14,6 +14,16 @@ from slave import Slave
 
 
 def key_to_list(val):
+    """
+    Transforms key to list
+
+    Params:
+        :val  -- int or slice: key to be transformed to list
+
+    Return:
+        :list -- []: transformed list
+    """
+
     if (type(val) == int):
         return [val]
     elif (type(val) == slice):
@@ -26,6 +36,13 @@ class Manager:
         self.comm = MPI.COMM_WORLD
 
     def handle_errors(self, response):
+        """
+        Handles response error.
+
+        Params:
+            :response -- int: response status
+        """
+        
         if (type(response[1]) == int and response[1] < 0):
             self.close()
             if (response[1] == -1):
@@ -37,12 +54,38 @@ class Manager:
 
 
     def malloc(self, size):
+        """
+        Allocates memory with requested size
+            Send message to master in order to allocate memory
+
+        Params:
+            :size -- int: size of memory that needs to be allocated
+
+        Return:
+            :key  -- int: key identifying the array to be allocated 
+        """
+        
         self.comm.send((1, size), dest=1)
         response = self.comm.recv(source=1)
         self.handle_errors(response)
         return response[1]
 
     def parse_key(self, key):
+        """
+        Parses key into message
+            key can be an integer representing an array key
+            key can be a slice representing a list of arrays keys
+            key can be a tuple 
+                first value is the array key
+                second value is the array slice
+
+        Params:
+            :key -- int or tuple or slice: key to parse
+
+        Return:
+            :message -- [ [int, int, int, int] ]: [ [key, start, stop, step] ]
+        """
+        
         message = []
         # case: request one or multiple arrays
         if (type(key) != tuple):
@@ -60,6 +103,21 @@ class Manager:
         return message
 
     def __getitem__(self, key):
+        """
+        Gets values of items on requested key.
+            Parse key
+            Send request to Master
+            Wait for response from Master
+            Handle error
+            Return result
+
+        Params:
+            :key    -- int or tuple or slice: requested key
+
+        Return:
+            :result -- [ [int] ]
+        """
+        
         message  = self.parse_key(key)
         self.comm.send((2, message), dest=1)
         response = self.comm.recv(source=1)
@@ -67,12 +125,35 @@ class Manager:
         return response[1]
 
     def __setitem__(self, key, value):
+        """
+        Sets requested items to value.
+            Parse key
+            Send request to Master
+            Wait for response from Master
+            Handle error
+
+        Params:
+            :key   -- int or tuple: requested key
+            :value -- int or [int]: value to be set
+        """
+        
         message = self.parse_key(key)
         self.comm.send((3, message, value), dest=1)
         response = self.comm.recv(source=1)
         self.handle_errors(response)
 
     def __delitem__(self, key):
+        """
+        Deletes array with requested key
+            Parse key
+            Send request to Master
+            Wait for response from Master
+            Handle error
+
+        Params:
+            :key -- int or slice: key (id) of the array to be deleted
+        """
+        
         if (type(key) == tuple):
             self.handle_errors((4, -3))
 
@@ -85,6 +166,17 @@ class Manager:
         self.comm.send((0, ), dest = 1)
 
 def launch(max_size=None, verbose=0):
+    """
+    Launch all machines
+
+    Params:
+        :max_size -- int: max_size of each machine
+        :verbose  -- int: level of verbose
+
+    Return:
+        :manager  -- Manager: an instance of the memory manager 
+    """
+    
     rank = MPI.COMM_WORLD.Get_rank()
 
     if (rank == 0):
