@@ -2,10 +2,8 @@ import sys
 
 from numpy import random
 
-
-
 if __name__ == "__main__":
-    if (len(sys.argv) != 3):
+    if len(sys.argv) != 3:
         print("Format: %s size seed" % sys.argv[0])
         exit(1)
 
